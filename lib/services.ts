@@ -165,6 +165,17 @@ export async function answerDocumentQuestion(
   }
 
   // Specific query matchers
+  if (qLower.includes("salary") || qLower.includes("compensation") || qLower.includes("remuneration") || qLower.includes("pay")) {
+    const salaryMatch = activeDocumentText.match(/(?:salary|remuneration|compensation)[^.\n]*?(?:₹|\$|INR|USD|[0-9,]+(?:\s*(?:Crore|Lakh|Rupees))?)[^.\n]*/i) ||
+                        activeDocumentText.match(/(?:₹|\$|INR|USD)\s*[0-9,]+[^\n\.]*/i);
+    if (salaryMatch) {
+      return {
+        answer: `According to the uploaded document: "${salaryMatch[0].trim()}"`,
+        source: "Document Grounded Match"
+      };
+    }
+  }
+
   if (qLower.includes("notice period") || qLower.includes("terminate") || qLower.includes("resignation") || qLower.includes("termination")) {
     const noticeMatch = activeDocumentText.match(/(?:providing|require|given)\s+(\d+\s*days)[^.\n]*/i) ||
                         activeDocumentText.match(/(?:notice period|written notice|termination)[^.\n]*?([^\n\.]{15,180})/i);

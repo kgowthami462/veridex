@@ -48,17 +48,28 @@ export async function extractTextFromDocument(
 
   const uint8Array = new Uint8Array(arrayBuffer);
 
-  // Check if content is plain readable text (e.g. test fixture or plain text string disguised as file)
+  // Magic Bytes Check
+  const isZipHeader = uint8Array.length >= 4 && uint8Array[0] === 0x50 && uint8Array[1] === 0x4b && uint8Array[2] === 0x03 && uint8Array[3] === 0x04;
+  const isPdfHeader = uint8Array.length >= 4 && uint8Array[0] === 0x25 && uint8Array[1] === 0x50 && uint8Array[2] === 0x44 && uint8Array[3] === 0x46;
+
+  // Extension spoofing check: file claiming to be .pdf but containing PK zip header
+  if (actualFileName.toLowerCase().endsWith(".pdf") && isZipHeader) {
+    return {
+      fileName: actualFileName,
+      fullText: "",
+      pageCount: 0,
+      pages: [],
+      error: "Upload security error: File extension is .pdf but binary content contains PK (Zip/DOCX) magic bytes. Spoofed extension rejected."
+    };
+  }
+
+  // Check if content is plain readable text (e.g. test fixture or plain text string)
   let rawDecoded = "";
   try {
     rawDecoded = new TextDecoder("utf-8", { fatal: false }).decode(uint8Array);
   } catch {
     rawDecoded = "";
   }
-
-  // If content does NOT start with %PDF- header or PK zip header, but contains readable legal text
-  const isPdfHeader = uint8Array.length >= 4 && uint8Array[0] === 0x25 && uint8Array[1] === 0x50 && uint8Array[2] === 0x44 && uint8Array[3] === 0x46;
-  const isZipHeader = uint8Array.length >= 4 && uint8Array[0] === 0x50 && uint8Array[1] === 0x4b && uint8Array[2] === 0x03 && uint8Array[3] === 0x04;
 
   if (!isZipHeader && (rawDecoded.includes("[Page 1]") || !isPdfHeader || !rawDecoded.includes("stream"))) {
     return parseTextToExtractedDoc(rawDecoded, actualFileName);

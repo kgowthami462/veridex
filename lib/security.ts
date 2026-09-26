@@ -1,7 +1,7 @@
 /**
  * Security & Validation Module for Veridex
  * Handles Upload Validation, Magic Byte Signatures, Malware Payload Scanning,
- * X-Ray PDF Cleaning, and Anti-Prompt-Injection Protection.
+ * Path Traversal Prevention, X-Ray PDF Cleaning, and Anti-Prompt-Injection Safeguards.
  */
 
 export type UploadValidationResult = {
@@ -34,19 +34,24 @@ const INJECTION_PATTERNS = [
 ];
 
 /**
- * Validates file upload security using magic bytes, extension matching, and payload scanning.
+ * Validates file upload security using magic bytes, extension matching, path safety, and payload scanning.
  */
 export async function validateUploadSecurity(
   bufferOrText: Uint8Array | ArrayBuffer | string,
   fileName: string
 ): Promise<UploadValidationResult> {
-  if (!fileName) {
+  if (!fileName || typeof fileName !== "string") {
     return { isValid: false, error: "Upload rejected: Missing file name." };
+  }
+
+  // 1. Path Traversal & Filename Sanitization Check
+  if (fileName.includes("..") || fileName.includes("/") || fileName.includes("\\") || fileName.includes("\0")) {
+    return { isValid: false, error: "Security Alert: Path traversal or invalid characters detected in file name." };
   }
 
   const lowerName = fileName.toLowerCase();
 
-  // 1. Convert input to Uint8Array for magic byte checking
+  // 2. Convert input to Uint8Array for magic byte checking
   let uint8: Uint8Array;
   let textContent = "";
 
@@ -69,35 +74,49 @@ export async function validateUploadSecurity(
     }
   }
 
-  // 2. Empty File Validation
+  // 3. Empty File Validation
   if (uint8.length === 0) {
     return { isValid: false, error: "Upload rejected: File is empty (0 bytes)." };
   }
 
-  // 3. Max File Size Limit (50MB)
-  const MAX_SIZE_BYTES = 50 * 1024 * 1024;
+  // 4. Max File Size Limit (25MB Limit enforced)
+  const MAX_SIZE_BYTES = 25 * 1024 * 1024;
   if (uint8.length > MAX_SIZE_BYTES) {
-    return { isValid: false, error: "Upload rejected: File size exceeds the maximum 50MB limit." };
+    return { isValid: false, error: "Upload rejected: File size exceeds the maximum 25MB limit." };
   }
 
-  // 4. Malware & Executable Payload Check
+  // 5. Malware & Executable Payload Check
   const payloadCheck = scanForMaliciousPayloads(uint8, textContent);
   if (!payloadCheck.isValid) {
     return payloadCheck;
   }
 
-  // 5. Magic Byte Verification by Extension
-  if (lowerName.endsWith(".pdf")) {
-    // PDF Magic Bytes: %PDF- (0x25, 0x50, 0x44, 0x46, 0x2D)
-    const isPdfMagic =
-      uint8.length >= 5 &&
-      uint8[0] === 0x25 &&
-      uint8[1] === 0x50 &&
-      uint8[2] === 0x44 &&
-      uint8[3] === 0x46 &&
-      uint8[4] === 0x2d;
+  // Helper flags for magic bytes
+  const isZipMagic =
+    uint8.length >= 4 &&
+    uint8[0] === 0x50 &&
+    uint8[1] === 0x4b &&
+    uint8[2] === 0x03 &&
+    uint8[3] === 0x04;
 
-    // Check header string if text representation is available
+  const isPdfMagic =
+    uint8.length >= 5 &&
+    uint8[0] === 0x25 &&
+    uint8[1] === 0x50 &&
+    uint8[2] === 0x44 &&
+    uint8[3] === 0x46 &&
+    uint8[4] === 0x2d;
+
+  // 6. Magic Byte Verification by Extension
+  if (lowerName.endsWith(".pdf")) {
+    // REJECT ZIP magic bytes disguised as PDF
+    if (isZipMagic) {
+      return {
+        isValid: false,
+        error: "Upload security error: File extension is .pdf but binary content contains PK (Zip/DOCX) magic bytes. Spoofed extension rejected."
+      };
+    }
+
     const headerStr = textContent.slice(0, 1024);
     const hasPdfHeader = isPdfMagic || headerStr.includes("%PDF-");
 
@@ -111,13 +130,13 @@ export async function validateUploadSecurity(
   }
 
   if (lowerName.endsWith(".docx")) {
-    // DOCX Zip Magic Bytes: PK\x03\x04 (0x50, 0x4B, 0x03, 0x04)
-    const isZipMagic =
-      uint8.length >= 4 &&
-      uint8[0] === 0x50 &&
-      uint8[1] === 0x4b &&
-      uint8[2] === 0x03 &&
-      uint8[3] === 0x04;
+    // REJECT PDF magic bytes disguised as DOCX
+    if (isPdfMagic) {
+      return {
+        isValid: false,
+        error: "Upload security error: File extension is .docx but binary content contains %PDF- magic bytes. Mismatched extension."
+      };
+    }
 
     if (!isZipMagic && !textContent.includes("word/document.xml")) {
       return {
@@ -129,8 +148,7 @@ export async function validateUploadSecurity(
   }
 
   if (lowerName.endsWith(".txt")) {
-    // Check for null bytes or binary executable headers in text files
-    if (hasNullBytesOrExecutableHeaders(uint8)) {
+    if (isPdfMagic || isZipMagic || hasNullBytesOrExecutableHeaders(uint8)) {
       return {
         isValid: false,
         error: "Upload security error: File extension is .txt but file contains raw binary or executable data."
