@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { answerDocumentQuestion } from "@/lib/services";
 import { useAppContext } from "@/components/providers/app-provider";
@@ -16,7 +16,7 @@ type Message = {
   source?: string;
 };
 
-export default function AskPage() {
+function AskContent() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get("q");
   const { apiKey, activeDocumentText, activeDocumentAnalysis } = useAppContext();
@@ -148,9 +148,9 @@ function MessageBubble({ message }: { message: Message }) {
       id: message.id,
       type: "question",
       referenceTitle: "Saved Q&A",
-      content: JSON.stringify({ question: message.content, answer: message.content, source: message.source }) // Simplified for demo
+      content: JSON.stringify({ question: message.content, answer: message.content, source: message.source })
     });
-  }
+  };
 
   return (
     <div className={`flex items-start gap-4 ${isUser ? 'flex-row-reverse ml-12' : 'mr-12'}`}>
@@ -177,5 +177,18 @@ function MessageBubble({ message }: { message: Message }) {
         )}
       </div>
     </div>
-  )
+  );
+}
+
+export default function AskPage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto px-4 py-16 text-center text-slate-500">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-[#C5A059]" />
+        <p className="text-sm font-medium">Loading Veridex Ask...</p>
+      </div>
+    }>
+      <AskContent />
+    </Suspense>
+  );
 }

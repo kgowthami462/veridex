@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { analyzeDocument } from "@/lib/services";
 import { DocumentAnalysis, Clause } from "@/lib/types";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { FileUp, Loader2, AlertCircle, ChevronDown, ChevronUp, Plus, MessageSquare, BookOpen, CheckCircle2, ShieldAlert, Sparkles, FileText, Check } from "lucide-react";
 import { Citation } from "@/components/legal/citation";
 
-export default function AnalyzePage() {
+function AnalyzeContent() {
   const searchParams = useSearchParams();
   const isDemo = searchParams.get("demo") === "true";
   const { apiKey, setActiveDocumentText, setActiveDocumentAnalysis } = useAppContext();
@@ -407,5 +407,18 @@ function ClauseItem({ clause }: { clause: Clause }) {
         </div>
       )}
     </Card>
+  );
+}
+
+export default function AnalyzePage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto px-4 py-16 text-center text-slate-500">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-[#C5A059]" />
+        <p className="text-sm font-medium">Loading Veridex X-Ray...</p>
+      </div>
+    }>
+      <AnalyzeContent />
+    </Suspense>
   );
 }
