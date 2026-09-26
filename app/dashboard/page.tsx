@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileSearch, BookOpen, GitCompare, Compass, FileText, ArrowRight, FileUp, UserCheck, HelpCircle } from "lucide-react";
+import { LegaleseExplainer } from "@/components/legal/legalese-explainer";
 
 export default function Dashboard() {
   return (
@@ -11,13 +12,17 @@ export default function Dashboard() {
       <div className="mb-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="font-serif text-3xl font-bold text-[#0B132B] mb-1">Dashboard</h1>
-          <p className="text-slate-500">Welcome to Veridex. Start a new analysis or explore your recent documents.</p>
+          <p className="text-slate-500">Welcome to Veridex. AI Legal Intelligence & Plain-Language Legal Access.</p>
         </div>
         <Link href="/#how-it-works">
           <Button variant="outline" className="gap-2 text-sm border-slate-300 text-slate-700 hover:bg-slate-100">
             <HelpCircle className="h-4 w-4 text-[#C5A059]" /> How Veridex Works
           </Button>
         </Link>
+      </div>
+
+      <div className="space-y-8 mb-10">
+        <LegaleseExplainer />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">

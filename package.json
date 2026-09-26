@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx tsx tests/run-tests.ts"
+    "test": "npx tsx tests/run-all.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",

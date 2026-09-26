@@ -2,19 +2,28 @@ import { demoDocumentAnalysis, demoLegalProvisions } from "./demo-data";
 import { DocumentAnalysis, SituationSummary, Clause } from "./types";
 import { extractTextFromDocument } from "./pdf-extractor";
 import { validateUploadSecurity } from "./security";
+import { veridexCache } from "./cache";
 
 /**
  * Analyzes an uploaded document using server-side processing & grounded extraction.
  * Uploaded files NEVER use generic placeholders or demo data.
+ * @param file Uploaded PDF/DOCX/TXT file object or null for demo document
+ * @param apiKey Optional Gemini API key
+ * @returns Grounded document analysis result
  */
 export async function analyzeDocument(file: File | null, apiKey?: string): Promise<DocumentAnalysis> {
   // If explicitly requested demo document (file === null)
   if (!file) {
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 300));
     return demoDocumentAnalysis;
   }
 
   const fileName = file.name;
+  const cacheKey = `analyze_${veridexCache.hashKey(fileName + "_" + file.size + "_" + (apiKey || ""))}`;
+  const cached = veridexCache.get<DocumentAnalysis>(cacheKey);
+  if (cached) {
+    return cached;
+  }
 
   // Step 1: Real Security & Magic Byte Signature Validation
   try {
@@ -83,6 +92,7 @@ export async function analyzeDocument(file: File | null, apiKey?: string): Promi
       if (res.ok) {
         const data: DocumentAnalysis = await res.json();
         if (data && data.document) {
+          veridexCache.set(cacheKey, data);
           return data;
         }
       }
@@ -92,7 +102,9 @@ export async function analyzeDocument(file: File | null, apiKey?: string): Promi
   }
 
   // Fallback to local grounded text extraction (Runs on actual uploaded text, NO generic placeholders)
-  return executeLocalGroundedAnalysis(fileName, extracted.fullText, extracted.pages, extracted.pageCount);
+  const result = executeLocalGroundedAnalysis(fileName, extracted.fullText, extracted.pages, extracted.pageCount);
+  veridexCache.set(cacheKey, result);
+  return result;
 }
 
 /**
