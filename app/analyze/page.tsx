@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { analyzeDocument } from "@/lib/services";
 import { extractTextFromDocument } from "@/lib/pdf-extractor";
 import { DocumentAnalysis, Clause } from "@/lib/types";
