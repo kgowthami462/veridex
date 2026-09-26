@@ -1,6 +1,7 @@
 {
   "name": "veridex",
   "version": "0.1.0",
+  "description": "VERIDEX — Gen AI Powered Legal Document Intelligence & Consultation Preparation Platform",
   "private": true,
   "scripts": {
     "dev": "next dev",
