@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { GitCompare, ChevronDown, ChevronUp, AlertCircle, Upload, FileText, CheckCircle2, Plus, RefreshCw, AlertTriangle } from "lucide-react";
+import { extractTextFromDocument } from "@/lib/pdf-extractor";
+import { validateUploadSecurity } from "@/lib/security";
 
 export default function ComparePage() {
   const [mode, setMode] = useState<"demo" | "upload">("demo");
@@ -21,28 +23,34 @@ export default function ComparePage() {
   const [activeFilter, setActiveFilter] = useState<"All" | "Added" | "Removed" | "Changed" | "Unchanged">("All");
   const [customComparison, setCustomComparison] = useState<ComparisonItem[]>([]);
 
-  // File Reader Helper
+  // File Upload Helper with Real PDF/Text Extraction & Security Validation
   const handleFileUpload = async (file: File, target: "A" | "B") => {
     setExtractionError(null);
     try {
-      if (file.size === 0) {
-        setExtractionError("We couldn't extract readable text from this document. File is empty.");
+      const buffer = await file.arrayBuffer();
+      const secCheck = await validateUploadSecurity(buffer, file.name);
+
+      if (!secCheck.isValid) {
+        setExtractionError(`Security Error (${file.name}): ${secCheck.error}`);
         return;
       }
-      
-      const text = await file.text();
-      // Simple readability check for text content vs unreadable binary
-      if (file.name.endsWith(".pdf") && text.includes("%PDF") && !text.includes("stream")) {
-        // Fallback text preview for PDF
-        const extracted = `Document: ${file.name}\nExtracted Clause Highlights:\n1. Termination: 60 days written notice required.\n2. Non-Compete: 6 months post-employment restriction.\n3. Governing Law: High Court of Delhi.`;
-        if (target === "A") { setFileA(file); setTextA(extracted); }
-        else { setFileB(file); setTextB(extracted); }
+
+      const extracted = await extractTextFromDocument(file);
+      if (extracted.error || !extracted.fullText) {
+        setExtractionError(`Extraction Error (${file.name}): ${extracted.error || "Failed to extract text."}`);
+        return;
+      }
+
+      if (target === "A") {
+        setFileA(file);
+        setTextA(extracted.fullText);
       } else {
-        if (target === "A") { setFileA(file); setTextA(text.slice(0, 3000)); }
-        else { setFileB(file); setTextB(text.slice(0, 3000)); }
+        setFileB(file);
+        setTextB(extracted.fullText);
       }
     } catch (e) {
-      setExtractionError("We couldn't extract readable text from this document.");
+      console.error(e);
+      setExtractionError(`We couldn't extract readable text from ${file.name}. Please ensure it is a valid PDF, DOCX, or TXT file.`);
     }
   };
 
@@ -54,42 +62,71 @@ export default function ComparePage() {
       setComparing(false);
 
       if (mode === "upload") {
-        if (!fileA || !fileB) {
-          setExtractionError("Please select both Document A and Document B to compare.");
+        if (!fileA || !fileB || !textA || !textB) {
+          setExtractionError("Please select and upload both Document A and Document B to compare.");
           return;
         }
 
-        // Generate comparative breakdown from uploaded document text
-        const generatedItems: ComparisonItem[] = [
-          {
-            topic: "Notice Period & Termination",
-            documentA: textA.includes("notice") || textA.includes("60") ? "60 days written notice required." : "30 days default notice period.",
-            documentB: textB.includes("notice") || textB.includes("90") ? "90 days written notice required." : "60 days notice period.",
-            status: "Changed",
-            whyItMatters: "Notice period requirement differs between the two uploaded drafts.",
-            questions: ["Which notice period aligns with your current transition timeline?"]
-          },
-          {
-            topic: "Non-Compete & Restraint of Trade",
-            documentA: textA.includes("compete") ? "12 months restriction across India." : "6 months non-solicitation.",
-            documentB: textB.includes("compete") ? "24 months global non-compete restriction." : "12 months non-compete.",
-            status: "Changed",
-            whyItMatters: "Section 27 of the Indian Contract Act renders post-employment non-competes void. Document B imposes a broader restraint.",
-            questions: ["Are you aware that post-employment non-compete clauses are generally unenforceable under Section 27?"]
-          },
-          {
-            topic: "Governing Law & Jurisdiction",
-            documentA: fileA.name.includes("v1") ? "Courts of Mumbai" : "Courts of Delhi",
-            documentB: fileB.name.includes("v2") ? "Courts of Bengaluru" : "Courts of Delhi",
-            status: fileA.name === fileB.name ? "Unchanged" : "Changed",
-            whyItMatters: "Determines which state courts will hear contractual disputes.",
-            questions: ["Is the designated court location convenient for both parties?"]
-          }
-        ];
+        // Generate comparative breakdown strictly from uploaded document texts
+        const generatedItems: ComparisonItem[] = [];
+
+        // 1. Compare Termination / Notice Periods
+        const noticeMatchA = textA.match(/(?:notice period|written notice|termination)[^.\n]*?([^\n\.]{15,120})/i);
+        const noticeMatchB = textB.match(/(?:notice period|written notice|termination)[^.\n]*?([^\n\.]{15,120})/i);
+
+        generatedItems.push({
+          topic: "Notice Period & Termination Terms",
+          documentA: noticeMatchA ? noticeMatchA[0].trim() : "Not found in Document A.",
+          documentB: noticeMatchB ? noticeMatchB[0].trim() : "Not found in Document B.",
+          status: noticeMatchA && noticeMatchB && noticeMatchA[0].trim() === noticeMatchB[0].trim() ? "Unchanged" : "Changed",
+          whyItMatters: "Modifications in termination notice terms alter contractual transition periods and severance eligibility.",
+          questions: ["Does the updated notice period align with your operational timeline?"]
+        });
+
+        // 2. Compare Compensation / Monetary Terms
+        const moneyA = textA.match(/(?:salary|remuneration|compensation|rent|deposit)[^.\n]*?([₹\$INRUSD0-9,\.\s]+(?:per annum|per month|lakhs|annually)?)\b/gi);
+        const moneyB = textB.match(/(?:salary|remuneration|compensation|rent|deposit)[^.\n]*?([₹\$INRUSD0-9,\.\s]+(?:per annum|per month|lakhs|annually)?)\b/gi);
+
+        generatedItems.push({
+          topic: "Compensation & Financial Remuneration",
+          documentA: moneyA ? moneyA.slice(0, 2).join(" | ") : "Not found in Document A.",
+          documentB: moneyB ? moneyB.slice(0, 2).join(" | ") : "Not found in Document B.",
+          status: (moneyA && moneyB && moneyA[0] === moneyB[0]) ? "Unchanged" : "Changed",
+          whyItMatters: "Direct financial impact regarding base salary, bonus caps, or deposit amounts.",
+          questions: ["Are financial changes accurately reflected in payroll or banking schedules?"]
+        });
+
+        // 3. Compare Restraint of Trade / Non-Compete
+        const nonCompA = textA.includes("non-compete") || textA.includes("compete") || textA.includes("restraint");
+        const nonCompB = textB.includes("non-compete") || textB.includes("compete") || textB.includes("restraint");
+
+        generatedItems.push({
+          topic: "Post-Employment Restraint & Non-Compete",
+          documentA: nonCompA ? "Contains post-employment non-compete / restraint clause." : "No explicit non-compete restraint identified.",
+          documentB: nonCompB ? "Contains post-employment non-compete / restraint clause." : "No explicit non-compete restraint identified.",
+          status: nonCompA === nonCompB ? "Unchanged" : (nonCompB ? "Added" : "Removed"),
+          whyItMatters: "Section 27 of the Indian Contract Act renders post-employment non-compete restraints void.",
+          questions: ["Is the non-compete restraint enforceable under local employment legislation?"]
+        });
+
+        // 4. Compare Governing Law & Jurisdiction
+        const govA = textA.match(/(?:governing law|jurisdiction|courts of)[^.\n]*?([^\n\.]{15,100})/i);
+        const govB = textB.match(/(?:governing law|jurisdiction|courts of)[^.\n]*?([^\n\.]{15,100})/i);
+
+        generatedItems.push({
+          topic: "Governing Law & Court Jurisdiction",
+          documentA: govA ? govA[0].trim() : "Not found in Document A.",
+          documentB: govB ? govB[0].trim() : "Not found in Document B.",
+          status: govA && govB && govA[0].trim() === govB[0].trim() ? "Unchanged" : "Changed",
+          whyItMatters: "Determines which judicial venue will hear disputes arising under the contract.",
+          questions: ["Is the designated court location accessible for both contracting parties?"]
+        });
+
         setCustomComparison(generatedItems);
       }
+
       setShowResults(true);
-    }, 1200);
+    }, 600);
   };
 
   const currentItems = mode === "demo" ? demoComparison : customComparison;
@@ -179,7 +216,7 @@ export default function ComparePage() {
                   <label htmlFor="docA-input" className="cursor-pointer text-xs bg-white border border-slate-300 px-3 py-1.5 rounded-md hover:bg-slate-100 transition-colors text-slate-700 font-medium">
                     {fileA ? fileA.name : "Choose File (.pdf, .docx, .txt)"}
                   </label>
-                  {fileA && <span className="text-[10px] text-green-700 mt-2 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Ready for extraction</span>}
+                  {fileA && <span className="text-[10px] text-green-700 mt-2 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Ready for extraction ({textA.length} chars)</span>}
                 </div>
 
                 {/* Upload B */}
@@ -196,7 +233,7 @@ export default function ComparePage() {
                   <label htmlFor="docB-input" className="cursor-pointer text-xs bg-white border border-slate-300 px-3 py-1.5 rounded-md hover:bg-slate-100 transition-colors text-slate-700 font-medium">
                     {fileB ? fileB.name : "Choose File (.pdf, .docx, .txt)"}
                   </label>
-                  {fileB && <span className="text-[10px] text-green-700 mt-2 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Ready for extraction</span>}
+                  {fileB && <span className="text-[10px] text-green-700 mt-2 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Ready for extraction ({textB.length} chars)</span>}
                 </div>
               </div>
             )}

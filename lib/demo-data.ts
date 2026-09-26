@@ -1,4 +1,4 @@
-import { Clause, DocumentAnalysis, LegalProvision, ComparisonItem } from "./types";
+import { DocumentAnalysis, LegalProvision, ComparisonItem } from "./types";
 
 export const demoDocumentAnalysis: DocumentAnalysis = {
   document: {

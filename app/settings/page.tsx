@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useAppContext } from "@/components/providers/app-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Settings, RefreshCw, AlertTriangle, Key, CheckCircle2, Eye, EyeOff, Sparkles, ShieldCheck } from "lucide-react";
+import { Settings, RefreshCw, Key, CheckCircle2, Eye, EyeOff, Sparkles, ShieldCheck } from "lucide-react";
 
 export default function SettingsPage() {
   const { isDemoMode, setDemoMode, apiKey, setApiKey, clearSavedItems } = useAppContext();

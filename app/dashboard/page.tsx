@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileSearch, BookOpen, GitCompare, MessageSquare, Compass, FileText, ArrowRight, FileUp, AlertTriangle, UserCheck, HelpCircle } from "lucide-react";
+import { FileSearch, BookOpen, GitCompare, Compass, FileText, ArrowRight, FileUp, UserCheck, HelpCircle } from "lucide-react";
 
 export default function Dashboard() {
   return (

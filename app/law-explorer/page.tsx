@@ -5,7 +5,7 @@ import { searchLegalProvision } from "@/lib/services";
 import { LegalProvision } from "@/lib/types";
 import { useAppContext } from "@/components/providers/app-provider";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Citation } from "@/components/legal/citation";
 import { Search, Loader2, BookOpen, Scale, Plus, AlertCircle, ExternalLink, CheckCircle2, ShieldCheck } from "lucide-react";

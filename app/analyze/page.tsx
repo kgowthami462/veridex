@@ -1,21 +1,21 @@
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { analyzeDocument } from "@/lib/services";
+import { extractTextFromDocument } from "@/lib/pdf-extractor";
 import { DocumentAnalysis, Clause } from "@/lib/types";
 import { useAppContext } from "@/components/providers/app-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileUp, Loader2, AlertCircle, ChevronDown, ChevronUp, Plus, MessageSquare, BookOpen, CheckCircle2, ShieldAlert, Sparkles, FileText, Check } from "lucide-react";
+import { FileUp, Loader2, AlertCircle, ChevronDown, ChevronUp, Plus, MessageSquare, BookOpen, CheckCircle2, ShieldAlert, FileText, Check } from "lucide-react";
 import { Citation } from "@/components/legal/citation";
 
 function AnalyzeContent() {
   const searchParams = useSearchParams();
   const isDemo = searchParams.get("demo") === "true";
   const { apiKey, setActiveDocumentText, setActiveDocumentAnalysis } = useAppContext();
-  const router = useRouter();
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [processStep, setProcessStep] = useState(1);
@@ -31,6 +31,15 @@ function AnalyzeContent() {
     }, 350);
 
     try {
+      if (file) {
+        const extracted = await extractTextFromDocument(file);
+        if (extracted.fullText) {
+          setActiveDocumentText(extracted.fullText);
+        }
+      } else {
+        setActiveDocumentText("");
+      }
+
       const result = await analyzeDocument(file, apiKey);
       clearInterval(stepInterval);
       setProcessStep(5);
@@ -43,7 +52,7 @@ function AnalyzeContent() {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [apiKey, setActiveDocumentAnalysis]);
+  }, [apiKey, setActiveDocumentAnalysis, setActiveDocumentText]);
 
   useEffect(() => {
     if (isDemo) {

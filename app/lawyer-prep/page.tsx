@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { useAppContext } from "@/components/providers/app-provider";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Printer, Download, Copy, Trash2, FileSearch, MessageSquare, BookOpen, CheckCircle2, ShieldAlert, Layers, CheckSquare, Clock } from "lucide-react";
 import { Clause, LegalProvision } from "@/lib/types";
@@ -229,6 +228,17 @@ export default function LawyerPrepPage() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {differences.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <h4 className="text-xs font-bold uppercase text-slate-500 tracking-wider">Document Comparison Differences ({differences.length})</h4>
+                {differences.map((item) => (
+                  <div key={item.id} className="p-3 bg-amber-50/60 rounded-md border border-amber-200 text-xs text-slate-800">
+                    <span className="font-bold text-[#0B132B]">{item.referenceTitle}</span>
+                  </div>
+                ))}
               </div>
             )}
           </section>
